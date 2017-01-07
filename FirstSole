@@ -1,0 +1,342 @@
+static unsigned int texture[2]; // Array of texture indices.
+static unsigned char chessboard[64][64][3]; // Storage for chessboard image.
+static int id = 0; // Currently displayed texture id.
+
+ static int night=0;
+ GLfloat	 lightPos[] = {-36.0,10.0,0.0, 10.0f };
+  static int nighta=0;
+  
+// Rotation amounts
+static GLfloat xRot = 0.0f;
+static GLfloat yRot = 0.0f;
+static GLfloat x = 0.0f;
+static GLfloat y = 0.0f;
+// These values need to be available globally
+// Light values and coordinates
+
+//---------------------------------shadow functions--------------------------------
+enum { X, Y, Z, W};
+enum {A, B, C, D};
+GLfloat floorshadow[4][4];
+/* create a matrix that will project the desired shadow */
+void shadowmatrix(GLfloat shadowMat[4][4], GLfloat groundplane[4],GLfloat lightpos[4])
+{
+  GLfloat dot;
+
+  /* find dot product between light position vector and ground plane normal */
+  dot = groundplane[X] * lightpos[X] +
+    groundplane[Y] * lightpos[Y] +
+    groundplane[Z] * lightpos[Z] +
+    groundplane[W] * lightpos[W];
+
+  shadowMat[0][0] = dot - lightpos[X] * groundplane[X];
+  shadowMat[1][0] = 0.f - lightpos[X] * groundplane[Y];
+  shadowMat[2][0] = 0.f - lightpos[X] * groundplane[Z];
+  shadowMat[3][0] = 0.f - lightpos[X] * groundplane[W];
+
+  shadowMat[X][1] = 0.f - lightpos[Y] * groundplane[X];
+  shadowMat[1][1] = dot - lightpos[Y] * groundplane[Y];
+  shadowMat[2][1] = 0.f - lightpos[Y] * groundplane[Z];
+  shadowMat[3][1] = 0.f - lightpos[Y] * groundplane[W];
+
+  shadowMat[X][2] = 0.f - lightpos[Z] * groundplane[X];
+  shadowMat[1][2] = 0.f - lightpos[Z] * groundplane[Y];
+  shadowMat[2][2] = dot - lightpos[Z] * groundplane[Z];
+  shadowMat[3][2] = 0.f - lightpos[Z] * groundplane[W];
+
+  shadowMat[X][3] = 0.f - lightpos[W] * groundplane[X];
+  shadowMat[1][3] = 0.f - lightpos[W] * groundplane[Y];
+  shadowMat[2][3] = 0.f - lightpos[W] * groundplane[Z];
+  shadowMat[3][3] = dot - lightpos[W] * groundplane[W];
+
+}
+
+/* find the plane equation given 3 points */
+void findplane(GLfloat plane[4],GLfloat v0[3], GLfloat v1[3], GLfloat v2[3])
+{
+  GLfloat vec0[3], vec1[3];
+
+  /* need 2 vectors to find cross product */
+  vec0[X] = v1[X] - v0[X];
+  vec0[Y] = v1[Y] - v0[Y];
+  vec0[Z] = v1[Z] - v0[Z];
+
+  vec1[X] = v2[X] - v0[X];
+  vec1[Y] = v2[Y] - v0[Y];
+  vec1[Z] = v2[Z] - v0[Z];
+
+  /* find cross product to get A, B, and C of plane equation */
+  plane[A] = vec0[Y] * vec1[Z] - vec0[Z] * vec1[Y];
+  plane[B] = -(vec0[X] * vec1[Z] - vec0[Z] * vec1[X]);
+  plane[C] = vec0[X] * vec1[Y] - vec0[Y] * vec1[X];
+
+  plane[D] = -(plane[A] * v0[X] + plane[B] * v0[Y] + plane[C] * v0[Z]);
+}
+
+//---------------------------------End of shadow functions--------------------------------
+//---------------------------------Calculate Normal functions-----------------------------
+////////////////////////////////////////////////
+// Reduces a normal vector specified as a set of three coordinates,
+// to a unit normal vector of length one.
+void ReduceToUnit(float vector[3])
+	{
+	float length;
+	
+	// Calculate the length of the vector		
+	length = (float)sqrt((vector[0]*vector[0]) + 
+						(vector[1]*vector[1]) +
+						(vector[2]*vector[2]));
+
+	// Keep the program from blowing up by providing an exceptable
+	// value for vectors that may calculated too close to zero.
+	if(length == 0.0f)
+		length = 1.0f;
+
+	// Dividing each element by the length will result in a
+	// unit normal vector.
+	vector[0] /= length;
+	vector[1] /= length;
+	vector[2] /= length;
+	}
+
+
+// Points p1, p2, & p3 specified in counter clock-wise order
+void calcNormal(float v[3][3], float out[3])
+	{
+	float v1[3],v2[3];
+	static const int x = 0;
+	static const int y = 1;
+	static const int z = 2;
+
+	// Calculate two vectors from the three points
+	v1[x] = v[0][x] - v[1][x];
+	v1[y] = v[0][y] - v[1][y];
+	v1[z] = v[0][z] - v[1][z];
+
+	v2[x] = v[1][x] - v[2][x];
+	v2[y] = v[1][y] - v[2][y];
+	v2[z] = v[1][z] - v[2][z];
+
+	// Take the cross product of the two vectors to get
+	// the normal vector which will be stored in out
+	out[x] = v1[y]*v2[z] - v1[z]*v2[y];
+	out[y] = v1[z]*v2[x] - v1[x]*v2[z];
+	out[z] = v1[x]*v2[y] - v1[y]*v2[x];
+
+	// Normalize the vector (shorten length to one)
+	ReduceToUnit(out);
+	}
+
+
+
+void DrawJet(int nShadow)
+	{
+	float vNormal[3];	// Storeage for calculated surface normal
+
+	// Nose Cone /////////////////////////////
+	// Set material color, note we only have to set to black
+	// for the shadow once
+	
+	//
+
+
+	if(nShadow == 0)
+           glColor3ub(0, 0,20);
+	else
+            glColor3ub(0,0,0);
+
+	glTranslatef(36.0,7.0,0.0);
+	 glColor3f (1.0,1.0, 0.0);
+	glutSolidSphere(2,20,10);
+	glPopMatrix();
+			glPushMatrix();
+	glColor3f (1.0,1.0, 0.0);
+	/*glTranslatef(8.0,7.0,2.0);	   
+	glutSolidCube(0.5);	*/
+	glTranslatef(-36.0,7.0,0.0);
+	 glColor3f (1.0,1.0, 0.0);
+	glutSolidSphere(2,20,10);
+	glPopMatrix();
+	    glPushMatrix(); 
+		glColor3f (0.5,0.4,1.0);
+		glTranslatef(10.0,-4.0,10.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+   
+	    glPushMatrix(); 
+		glColor3f (0.2,0.7,0.1);
+		 glRotatef(-20,1,0,1);
+		glTranslatef(9.0,-4.0,9.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+    glPushMatrix();
+	   glPushMatrix(); 
+		glColor3f (0.5,0.0,1.0);
+		glTranslatef(26.0,-4.0,10.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+    glPushMatrix();
+	   glPushMatrix(); 
+		glColor3f (0.1,0.0,0.9);
+		glTranslatef(-5.0,-4.0,5.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+
+
+
+
+	
+	}
+
+
+
+
+
+
+
+ //GLfloat	 lightPosa[] = {37.0,7.0,0.0, 0.0f };
+ void timerfunctiona (int value)
+{
+
+night = (night +5)%360;
+//nighta=(nighta-6)%360;
+
+	glutPostRedisplay();
+	glutTimerFunc(100,timerfunctiona ,1);
+
+}
+void DrawSole(int i)
+    {
+glPushMatrix();
+glRotatef(night,1.0,1.0,1.0);
+glTranslatef(0.0,150.0,0.0);				
+glLightfv(GL_LIGHT0,GL_POSITION,lightPos);
+glPopMatrix();
+   glEnable(GL_LIGHT0);            
+
+			glPushMatrix();
+	glColor3f (1.0,1.0, 0.0);
+	/**glTranslatef(8.0,7.0,2.0);	   
+	glutSolidCube(0.5);	*/
+	glTranslatef(36.0,7.0,0.0);
+	 glColor3f (1.0,1.0, 0.0);
+	glutSolidSphere(2,20,10);
+	glPopMatrix();
+			glPushMatrix();
+	glColor3f (1.0,1.0, 0.0);
+	/*glTranslatef(8.0,7.0,2.0);	   
+	glutSolidCube(0.5);	*/
+	glTranslatef(-36.0,7.0,0.0);
+	 glColor3f (1.0,1.0, 0.0);
+	glutSolidSphere(2,20,10);
+	glPopMatrix();
+	    glPushMatrix(); 
+		glColor3f (0.5,0.4,1.0);
+		glTranslatef(10.0,-4.0,10.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+   
+	    glPushMatrix(); 
+		glColor3f (0.2,0.7,0.1);
+		 glRotatef(-20,1,0,1);
+		glTranslatef(9.0,-4.0,9.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+    glPushMatrix();
+	   glPushMatrix(); 
+		glColor3f (0.5,0.0,1.0);
+		glTranslatef(26.0,-4.0,10.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+    glPushMatrix();
+	   glPushMatrix(); 
+		glColor3f (0.1,0.0,0.9);
+		glTranslatef(-5.0,-4.0,5.0);
+		 glutSolidTeapot(1.0f);
+		glPopMatrix();
+
+	
+	
+		DrawJet(1);
+
+    GLfloat fExtent = 40.0f;
+    GLfloat fStep = 1.0f;
+    GLfloat y = -0.4f;
+    GLint iLine;
+    if(i == 0){
+      id=0;
+      glTranslatef(0,-5,0);
+      glRotatef(90,1,0,0);
+    }else if(i == 1){
+        id =1;
+      	//saghf
+      glTranslatef(0,15,0);
+      glRotatef(90,1,0,0);
+    }else if(i == 2){
+        id=2;
+      	//divar posht
+      glTranslatef(-42,20,-40);
+      glRotatef(180,1,0,0);
+    }else if(i == 3){
+       id=2;
+      	//divar golo
+      glTranslatef(-42,20,40);
+      glRotatef(180,1,0,0);
+    }else if(i == 4){
+       id=2;
+      	//divar rast
+       //////////////////////////////////
+      glTranslatef(40,-10,41);
+      glRotatef(90,0,1,0);
+    }else if(i == 5){
+       id=2;
+      	//divar chap
+      glTranslatef(-40,-10,42);
+      glRotatef(90,0,1,0);
+    }
+    glEnable(GL_TEXTURE_2D);
+    if(i == 2 || i == 3 || i == 4 || i == 5){
+      int j = 0;
+      int s = 0;
+      for (j = 0; j < 17; j++)
+      {
+        glBindTexture(GL_TEXTURE_2D, texture[id]);
+        glTranslatef(5,0,0);
+        for(s = 0;s<20;s++){
+        glPushMatrix();
+            glTranslatef(0,s+5,0);
+              glBegin(GL_POLYGON);
+              glTexCoord2f(0.0, 0.0);glVertex3f(-3, -3, 0.0);
+              glTexCoord2f(1.0, 0.0);glVertex3f(3, -3, 0.0);
+              glTexCoord2f(1.0, 1.0);glVertex3f(3,3, 0.0);
+              glTexCoord2f(0.0, 1.0);glVertex3f(-3, 3, 0.0);
+            glEnd();
+        glPopMatrix();
+        }
+        
+      }
+	  
+	
+
+    }
+  
+    if(i==0 || i == 1){
+    glBindTexture(GL_TEXTURE_2D, texture[id]);
+   glBegin(GL_POLYGON);
+      //mokhtasat texture      //   mokan morabaA
+      glTexCoord2f(0.0, 0.0);  glVertex3f(-fExtent, -fExtent, 0.0);
+      glTexCoord2f(1.0, 0.0); glVertex3f(fExtent, -fExtent, 0.0);
+      glTexCoord2f(1.0, 1.0); glVertex3f(fExtent, fExtent, 0.0);
+      glTexCoord2f(0.0, 1.0); glVertex3f(-fExtent, fExtent, 0.0);
+   glEnd();
+  }
+    glPopMatrix();
+    glDisable(GL_TEXTURE_2D);
+    }
+
+
